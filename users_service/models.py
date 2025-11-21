@@ -41,20 +41,20 @@ def get_user_by_username_or_email(username, email):
     except Exception as e:
         return (None, {"msg": str(e), "type": "database_error"})
     
-def insert_user(name, username, email, hashed_password, role):
+def insert_user(name, username, email, password_hash, role):
     """
     Insert a new user into the database.
     Returns the inserted user's ID.
     """
     query = """
-    INSERT INTO users (name, username, email, password, role)
+    INSERT INTO users (name, username, email, password_hash, role)
     VALUES (%s, %s, %s, %s, %s)
     RETURNING id
     """
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(query, (name, username, email, hashed_password, role))
+                cursor.execute(query, (name, username, email, password_hash, role))
                 user_id = cursor.fetchone()[0]
                 conn.commit()
                 return user_id
@@ -143,7 +143,7 @@ def update_user(user_id, name=None, username=None, email=None, password=None, ro
         toupdate.append("email=%s")
         respective_vals.append(email)
     if password:
-        toupdate.append("password=%s")
+        toupdate.append("password_hash=%s")
         respective_vals.append(hasher(password))
     if role:
         if role =="admin":

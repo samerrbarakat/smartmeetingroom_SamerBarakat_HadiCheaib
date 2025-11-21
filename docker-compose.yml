@@ -1,36 +1,38 @@
-version: "3.9"
-
 services:
   db:
-    image: postgres:16 # we start from a base image 
-    container_name: srms-db
+    image: postgres:16
+    container_name: srms_db
+    restart: always
     environment:
-      POSTGRES_DB: srms_db
       POSTGRES_USER: appuser
       POSTGRES_PASSWORD: appsecret
+      POSTGRES_DB: srms_db
     ports:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d
-    networks:
-      - backend
-      # later on we will add the services for each service we have and relate them to their own docker files. 
+      - ./db/init/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
   users_service:
     build:
-      context: ./users_service
-    container_name: users-service
+      context: .
+      dockerfile: users_service/Dockerfile
+    container_name: users_service
+    restart: always
     environment:
-      DATABASE_URL: postgres://appuser:appsecret@db:5432/srms_db
-    ports:
-      - "5001:5000"
+      DATABASE_URL: postgresql://appuser:appsecret@db:5432/srms_db
+      JWT_SECRET: "dev-secret-change-me"
+      PORT: "8000"
     depends_on:
       - db
+    ports:
+      - "8001:8000"
     networks:
-      - backend
-networks:
-  backend:
-
+      - srms_net
 
 volumes:
   db_data:
+
+networks:
+  srms_net:
+    driver: bridge
