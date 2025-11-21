@@ -1,0 +1,136 @@
+import os
+from typing import Any, Dict, Optional
+
+from flask import Flask, jsonify, request
+
+from helperSQL import create_room, update_room, delete_room, list_available_rooms, get_room_status
+
+
+app = Flask(__name__)
+
+
+def _parse_int(value: Optional[str]) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def _parse_equipment_param(value: Optional[str]) -> Optional[Dict[str, Any]]:
+    if value is None:
+        return None
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    if not items:
+        return None
+    return {item: 1 for item in items}
+
+
+@app.route("/rooms", methods=["POST"])
+def create_room_route():
+    payload = request.get_json(silent=True) or {}
+    name = payload.get("name")
+    capacity = payload.get("capacity")
+    location = payload.get("location")
+    equipment = payload.get("equipment")
+    status = payload.get("status", "available")
+
+    if not isinstance(name, str) or not isinstance(location, str):
+        return jsonify({"error": "name and location are required strings"}), 400
+    if not isinstance(capacity, int) or capacity <= 0:
+        return jsonify({"error": "capacity must be a positive integer"}), 400
+    if equipment is not None and not isinstance(equipment, dict):
+        return jsonify({"error": "equipment must be an object"}), 400
+
+    try:
+        room = create_room(
+            name=name,
+            capacity=capacity,
+            equipment=equipment,
+            location=location,
+            status=status,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(room), 201
+
+@app.route("/rooms/<int:room_id>", methods=["PATCH"])
+def update_room_route(room_id: int):
+    payload = request.get_json(silent=True) or {}
+    updates: Dict[str, Any] = {}
+
+    if "name" in payload:
+        if not isinstance(payload["name"], str):
+            return jsonify({"error": "name must be a string"}), 400
+        updates["name"] = payload["name"]
+    if "capacity" in payload:
+        if not isinstance(payload["capacity"], int) or payload["capacity"] <= 0:
+            return jsonify({"error": "capacity must be a positive integer"}), 400
+        updates["capacity"] = payload["capacity"]
+    if "equipment" in payload:
+        if payload["equipment"] is not None and not isinstance(payload["equipment"], dict):
+            return jsonify({"error": "equipment must be an object"}), 400
+        updates["equipment"] = payload["equipment"]
+    if "location" in payload:
+        if not isinstance(payload["location"], str):
+            return jsonify({"error": "location must be a string"}), 400
+        updates["location"] = payload["location"]
+    if "status" in payload:
+        if not isinstance(payload["status"], str):
+            return jsonify({"error": "status must be a string"}), 400
+        updates["status"] = payload["status"]
+
+    if not updates:
+        room = update_room(room_id)
+        if room is None:
+            return jsonify({"error": "room not found"}), 404
+        return jsonify(room)
+
+    try:
+        room = update_room(room_id, **updates)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if room is None:
+        return jsonify({"error": "room not found"}), 404
+    return jsonify(room)
+
+
+@app.route("/rooms/<int:room_id>", methods=["DELETE"])
+def delete_room_route(room_id: int):
+    deleted = delete_room(room_id)
+    if not deleted:
+        return jsonify({"error": "room not found"}), 404
+    return ("", 204)
+
+
+@app.route("/rooms/available", methods=["GET"])
+def list_available_rooms_route():
+    capacity_param = request.args.get("capacity")
+    location = request.args.get("location")
+    equipment_param = request.args.get("equipment")
+
+    capacity = _parse_int(capacity_param)
+    equipment = _parse_equipment_param(equipment_param)
+
+    rooms = list_available_rooms(capacity=capacity, location=location, equipment=equipment)
+    return jsonify(rooms)
+
+
+@app.route("/rooms/<int:room_id>/status", methods=["GET"])
+def get_room_status_route(room_id: int):
+    status_info = get_room_status(room_id)
+    if status_info is None:
+        return jsonify({"error": "room not found"}), 404
+    return jsonify(status_info)
+
+
+if __name__ == "__main__":
+    port_value = os.getenv("PORT", "5000")
+    try:
+        port = int(port_value)
+    except ValueError:
+        port = 5000
+    app.run(host="0.0.0.0", port=port)
