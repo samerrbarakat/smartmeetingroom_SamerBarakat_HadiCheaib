@@ -65,7 +65,7 @@ def create_app():
         room_available = db_check_room_availability(room_id, start_time,end_time)
         if not room_available:
             return jsonify({"message" : "Room is not available at the suggested time"}) , 409
-        booking_create = db_create_booking(user_id)
+        booking_create = db_create_booking(user_id, room_id, start_time, end_time)
         if not booking_create:
             return jsonify({"message" : "Create booking failed"}), 500
         
@@ -87,7 +87,7 @@ def create_app():
         return jsonify(bookings), 200
 
     @app.route('/api/v1/bookings/user/<int:user_id>', methods=['GET'])
-    def get_user_bookings():
+    def get_user_bookings(user_id):
         """
         View bookings for a given user id (for admin, facility manager, auditor; user themself can also use it).
         
@@ -127,7 +127,7 @@ def create_app():
     
     
     @app.route('/api/v1/bookings/<int:booking_id>', methods=['GET'])
-    def get_booking():
+    def get_booking(booking_id):
         """
         get a booking by id
         """
@@ -140,11 +140,10 @@ def create_app():
         booking_id = request.view_args['booking_id']
 
         booking = db_get_booking_by_id(booking_id)
-        if booking["user_id"] != user_id and role=="user" : 
-            return jsonify({"message": "You can only see your own books unless you are previlegd"}),403
-        
         if not booking : 
             return jsonify({"message":"Booking not found"}),404
+        if booking["user_id"] != user_id and role=="user" : 
+            return jsonify({"message": "You can only see your own books unless you are previlegd"}),403
         
         
         
@@ -172,11 +171,11 @@ def create_app():
         booking_id_exists = db_get_booking_by_id(booking_id)
         if not booking_id_exists:
             return jsonify({"message":" Booking doesnt exist! "}), 404 
-        if booking_id_exists.status == "cancelled":
+        if booking_id_exists["status"] == "cancelled":
             return jsonify({"message" : "Cannot update a cancelled booking"}), 400
-        if booking_id_exists.user_id!= claims.get("user_id") and claims.get("role") =="user":
+        if booking_id_exists["user_id"]!= claims.get("user_id") and claims.get("role") =="user":
             return jsonify({"message" : "You can only update your own booking"}),403
-        if booking_id_exists.start_time <= now():
+        if booking_id_exists["start_time"] <= now():
              return jsonify({"message" : "cbooking already started or finished "}), 400
         room_exists =  db_check_room_exists(room_id)
         if not room_exists: 
@@ -269,7 +268,7 @@ def create_app():
         room_available = db_check_room_availability(room_id, start_time,end_time)
         return jsonify({"room_available": room_available}), 200
 
-    @app.route('/api/v1/bookings/room/<int:int:room_id>', methods=['GET'])
+    @app.route('/api/v1/bookings/room/<int:room_id>', methods=['GET'])
     def get_bookings_for_room(room_id):
         """
         View all bookings for a given room id.
