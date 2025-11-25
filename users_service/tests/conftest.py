@@ -26,6 +26,7 @@ from users_service.main import create_app  # noqa: E402
 
 @pytest.fixture(scope="session")
 def app():
+    """Create and configure a new app instance for each test session."""
     app = create_app()
     app.config.update(TESTING=True)
     return app
@@ -33,6 +34,7 @@ def app():
 
 @pytest.fixture(scope="function")
 def client(app):
+    """A test client for the app."""
     with app.test_client() as client:
         yield client
 

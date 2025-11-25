@@ -270,6 +270,7 @@ def test_db_soft_cancel_booking_success(monkeypatch):
 # ---------- db_hard_delete_booking ----------
 
 def test_db_hard_delete_booking_commits(monkeypatch):
+    """Test that db_hard_delete_booking deletes a booking and commits the transaction."""
     cur = DummyCursor()
     conn = DummyConn(cur)
     monkeypatch.setattr(models, "get_db_connection", lambda: conn_ctx(conn))
@@ -285,6 +286,7 @@ def test_db_hard_delete_booking_commits(monkeypatch):
 # ---------- db_get_bookings_by_room ----------
 
 def test_db_get_bookings_by_room(monkeypatch):
+    """Test that db_get_bookings_by_room returns all bookings for a specific room."""
     rows = [{"id": 1, "room_id": 99}]
     cur = DummyCursor(many=rows)
     conn = DummyConn(cur)

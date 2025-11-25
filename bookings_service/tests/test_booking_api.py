@@ -14,6 +14,7 @@ def _auth_header(token: str) -> dict:
 
 @pytest.fixture
 def app(monkeypatch):
+    """Create app with stubbed auth and deterministic time for testing."""
     # Stub JWT decoder used by authenticate_request
     def fake_degenerate_jwt(token, secret="your_secret_key"):
         if token == "user-token":
@@ -35,17 +36,20 @@ def app(monkeypatch):
 
 @pytest.fixture
 def client(app):
+    """Create a test client for the app."""
     return app.test_client()
 
 
 # ---------- /api/v1/bookings (POST) ----------
 
 def test_create_booking_requires_auth(client):
+    """Test that creating a booking requires authentication."""
     resp = client.post("/api/v1/bookings", json={})
     assert resp.status_code == 401
 
 
 def test_create_booking_room_not_found(client, monkeypatch):
+    """Test that creating a booking fails if the room does not exist."""
     def fake_check_room_exists(room_id):
         return False
 
@@ -68,6 +72,7 @@ def test_create_booking_room_not_found(client, monkeypatch):
 
 
 def test_create_booking_conflict(client, monkeypatch):
+    """Test that creating a booking fails if there is a conflict."""
     monkeypatch.setattr(main, "db_check_room_exists", lambda room_id: True)
     monkeypatch.setattr(main, "db_check_room_availability", lambda r, s, e: False)
 
@@ -88,6 +93,8 @@ def test_create_booking_conflict(client, monkeypatch):
 
 
 def test_create_booking_success(client, monkeypatch):
+    """Test that creating a booking succeeds with valid input."""
+    
     monkeypatch.setattr(main, "db_check_room_exists", lambda room_id: True)
     monkeypatch.setattr(main, "db_check_room_availability", lambda r, s, e: True)
 
@@ -123,6 +130,7 @@ def test_create_booking_success(client, monkeypatch):
 # ---------- /api/v1/bookings/myhistory (GET) ----------
 
 def test_get_booking_history_success(client, monkeypatch):
+    """Test that getting booking history for the authenticated user succeeds."""
     expected = [
         {"id": 1, "user_id": 1},
         {"id": 2, "user_id": 1},
@@ -146,6 +154,7 @@ def test_get_booking_history_success(client, monkeypatch):
 # ---------- /api/v1/bookings/user/<user_id> (GET) ----------
 
 def test_get_user_bookings_forbidden_for_other_user(client, monkeypatch):
+    """Test that a regular user cannot view another user's bookings."""
     resp = client.get(
         "/api/v1/bookings/user/2",  # different from user_id=1 in token
         headers=_auth_header("user-token"),
@@ -154,6 +163,7 @@ def test_get_user_bookings_forbidden_for_other_user(client, monkeypatch):
 
 
 def test_get_user_bookings_admin_can_view_other_user(client, monkeypatch):
+    """Test that an admin can view another user's bookings."""
     expected = [{"id": 1, "user_id": 5}]
 
     def fake_get_bookings(user_id):
@@ -172,6 +182,7 @@ def test_get_user_bookings_admin_can_view_other_user(client, monkeypatch):
 
 
 def test_get_user_bookings_not_found(client, monkeypatch):
+    """Test that getting bookings for a user with no bookings returns 404."""
     monkeypatch.setattr(main, "db_get_bookings_by_user", lambda uid: None)
 
     resp = client.get(
@@ -185,6 +196,7 @@ def test_get_user_bookings_not_found(client, monkeypatch):
 # ---------- /api/v1/bookings (GET all) ----------
 
 def test_get_all_bookings_user_forbidden(client):
+    """Test that a regular user cannot view all bookings."""
     resp = client.get(
         "/api/v1/bookings",
         headers=_auth_header("user-token"),
@@ -193,6 +205,7 @@ def test_get_all_bookings_user_forbidden(client):
 
 
 def test_get_all_bookings_admin_ok(client, monkeypatch):
+    """Test that an admin can view all bookings."""
     expected = [{"id": 1}, {"id": 2}]
     monkeypatch.setattr(main, "db_get_all_bookings", lambda: expected)
 
@@ -208,6 +221,7 @@ def test_get_all_bookings_admin_ok(client, monkeypatch):
 # ---------- /api/v1/bookings/<id> (GET) ----------
 
 def test_get_booking_not_found(client, monkeypatch):
+    """Test that getting a booking that does not exist returns 404."""
     monkeypatch.setattr(main, "db_get_booking_by_id", lambda bid: None)
 
     resp = client.get(
@@ -219,6 +233,7 @@ def test_get_booking_not_found(client, monkeypatch):
 
 
 def test_get_booking_user_only_own(client, monkeypatch):
+    """Test that a regular user can only view their own booking."""
     booking = {"id": 1, "user_id": 2}  # different from user_id=1 token
 
     monkeypatch.setattr(main, "db_get_booking_by_id", lambda bid: booking)
@@ -232,6 +247,7 @@ def test_get_booking_user_only_own(client, monkeypatch):
 
 
 def test_get_booking_success(client, monkeypatch):
+    """Test that a regular user can view their own booking."""
     booking = {"id": 1, "user_id": 1}
 
     monkeypatch.setattr(main, "db_get_booking_by_id", lambda bid: booking)
@@ -248,6 +264,7 @@ def test_get_booking_success(client, monkeypatch):
 # ---------- /api/v1/bookings/<id> (PATCH) ----------
 
 def test_update_booking_success(client, monkeypatch):
+    """Test that updating a booking succeeds with valid input."""
     future_start = FIXED_NOW + timedelta(hours=1)
 
     booking_row = {
@@ -267,6 +284,7 @@ def test_update_booking_success(client, monkeypatch):
     )
 
     def fake_update(bid, room_id, start, end):
+        """Fake update booking function for testing."""
         assert bid == 1
         return {
             **booking_row,
@@ -297,6 +315,7 @@ def test_update_booking_success(client, monkeypatch):
 # ---------- /api/v1/bookings/<id>/cancel (POST) ----------
 
 def test_soft_cancel_booking_success(client, monkeypatch):
+    """Test that soft cancelling a booking succeeds."""
     future_start = FIXED_NOW + timedelta(hours=1)
 
     booking = {
@@ -328,6 +347,7 @@ def test_soft_cancel_booking_success(client, monkeypatch):
 # ---------- /api/v1/bookings/<id>/hard (DELETE) ----------
 
 def test_hard_cancel_booking_admin_only(client, monkeypatch):
+    """Test that only an admin can hard delete a booking."""
     booking = {"id": 1}
     monkeypatch.setattr(main, "db_get_booking_by_id", lambda bid: booking)
     monkeypatch.setattr(main, "db_hard_delete_booking", lambda bid: None)
@@ -344,6 +364,7 @@ def test_hard_cancel_booking_admin_only(client, monkeypatch):
 # ---------- /api/v1/bookings/availability (GET) ----------
 
 def test_check_availability_success(client, monkeypatch):
+    """Test that checking room availability succeeds."""
     monkeypatch.setattr(main, "db_check_room_exists", lambda rid: True)
     monkeypatch.setattr(
         main, "db_check_room_availability",
@@ -363,6 +384,7 @@ def test_check_availability_success(client, monkeypatch):
 # ---------- /api/v1/bookings/room/<room_id> (GET) ----------
 
 def test_get_bookings_for_room_facility_manager(client, monkeypatch):
+    """Test that a facility manager can view bookings for a specific room."""
     expected = [
         {"id": 1, "room_id": 10},
         {"id": 2, "room_id": 10},

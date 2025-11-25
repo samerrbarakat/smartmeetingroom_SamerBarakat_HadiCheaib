@@ -333,8 +333,18 @@ def create_app():
         """
         Check whether a room is free in a given timeslot (satisfies “Checking room availability (based on time and date)” requirement).   
         
+        Takes input: room_id, start_time, end_time as query parameters.
+        Returns: room availability status.
+        Checks: user authentication, room existence.
+        Flow:
+        - Authenticate user.
+        - Validate input.
+        - Check room existence.
+        - Check room availability.
+        - Return availability status.
+        
         example : /api/v1/bookings/availability?room_id=2&start_time=2025-11-23T14:00:00&end_time=2025-11-23T15:00:00
-             
+        
         """
         claims = authenticate_request(request)
         if not claims : 
@@ -358,7 +368,16 @@ def create_app():
     @app.route('/api/v1/bookings/room/<int:room_id>', methods=['GET'])
     def get_bookings_for_room(room_id):
         """
-        View all bookings for a given room id.
+        View bookings for a given room id (for admin, facility manager, auditor).
+        Takes input: none.
+        Returns: list of bookings.
+        Checks: user authentication and authorization.
+        Flow:
+        - Authenticate user.
+        - Authorize user (admin, facility manager, auditor).
+        - Fetch bookings for room.
+        - Return bookings.
+        
         """
         
         claims = authenticate_request(request)
