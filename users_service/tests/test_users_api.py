@@ -51,7 +51,7 @@ def test_api_register_user(clear_users_table):
 
     response = client.post("/api/v1/users/register", json=to_send)
     data = response.get_json()
-
+            
     assert response.status_code in (200, 201)
     assert data["email"] == to_send["email"]
     assert data["username"] == to_send["username"]

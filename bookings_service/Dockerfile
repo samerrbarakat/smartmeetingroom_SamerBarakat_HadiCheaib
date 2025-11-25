@@ -12,9 +12,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # copy only users_service first (better caching)
-COPY users_service/requirements.txt /app/users_service/requirements.txt
+COPY bookings_service/requirements.txt /app/bookings_service/requirements.txt
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r /app/users_service/requirements.txt
+    && pip install --no-cache-dir -r /app/bookings_service/requirements.txt
 
 # now copy service code
 COPY bookings_service /app/bookings_service
