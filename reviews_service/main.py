@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, Optional
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Blueprint
 from flask_cors import CORS
 
 from reviews_service.auth import degenerate_jwt
@@ -43,11 +43,13 @@ def create_app():
     CORS(app)
     register_error_handlers(app)
 
+    bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
+
     @app.route("/health", methods=["GET"])
     def health_check():
         return jsonify({"status": "ok"}), 200
 
-    @app.route("/api/v1/reviews", methods=["POST"])
+    @bp.route("/reviews", methods=["POST"])
     def submit_review():
         claims = authenticate_request(request)
         if not claims:
@@ -76,7 +78,7 @@ def create_app():
 
         return jsonify(review), 201
 
-    @app.route("/api/v1/reviews", methods=["GET"])
+    @bp.route("/reviews", methods=["GET"])
     def list_all_reviews_route():
         claims = authenticate_request(request)
         if not claims or claims.get("role") not in ROLE_READ_ALL:
@@ -84,12 +86,12 @@ def create_app():
         reviews = list_all_reviews()
         return jsonify(reviews), 200
 
-    @app.route("/api/v1/rooms/<int:room_id>/reviews", methods=["GET"])
+    @bp.route("/rooms/<int:room_id>/reviews", methods=["GET"])
     def get_reviews_for_room(room_id: int):
         reviews = list_reviews_by_room(room_id)
         return jsonify(reviews), 200
 
-    @app.route("/api/v1/reviews/mine", methods=["GET"])
+    @bp.route("/reviews/mine", methods=["GET"])
     def get_my_reviews():
         claims = authenticate_request(request)
         if not claims:
@@ -100,7 +102,7 @@ def create_app():
         reviews = list_reviews_by_user(int(user_id))
         return jsonify(reviews), 200
 
-    @app.route("/api/v1/reviews/<int:review_id>", methods=["PATCH"])
+    @bp.route("/reviews/<int:review_id>", methods=["PATCH"])
     def update_review_route(review_id: int):
         claims = authenticate_request(request)
         if not claims:
@@ -129,7 +131,7 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return jsonify(updated), 200
 
-    @app.route("/api/v1/reviews/<int:review_id>", methods=["DELETE"])
+    @bp.route("/reviews/<int:review_id>", methods=["DELETE"])
     def delete_review_route(review_id: int):
         claims = authenticate_request(request)
         if not claims:
@@ -149,7 +151,7 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return ("", 204)
 
-    @app.route("/api/v1/reviews/<int:review_id>/flag", methods=["POST"])
+    @bp.route("/reviews/<int:review_id>/flag", methods=["POST"])
     def flag_review_route(review_id: int):
         claims = authenticate_request(request)
         if not claims:
@@ -165,7 +167,7 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return jsonify(flagged), 200
 
-    @app.route("/api/v1/reviews/<int:review_id>/flag/clear", methods=["POST"])
+    @bp.route("/reviews/<int:review_id>/flag/clear", methods=["POST"])
     def clear_flag_route(review_id: int):
         claims = authenticate_request(request)
         if not claims or claims.get("role") not in ROLE_MODERATION:
@@ -176,7 +178,7 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return jsonify(cleared), 200
 
-    @app.route("/api/v1/reviews/<int:review_id>/remove", methods=["POST"])
+    @bp.route("/reviews/<int:review_id>/remove", methods=["POST"])
     def remove_review_route(review_id: int):
         claims = authenticate_request(request)
         if not claims or claims.get("role") not in ROLE_MODERATION:
@@ -190,7 +192,7 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return jsonify(removed), 200
 
-    @app.route("/api/v1/reviews/<int:review_id>/restore", methods=["POST"])
+    @bp.route("/reviews/<int:review_id>/restore", methods=["POST"])
     def restore_review_route(review_id: int):
         claims = authenticate_request(request)
         if not claims or claims.get("role") not in ROLE_MODERATION:
@@ -201,4 +203,5 @@ def create_app():
             raise ApiError(404, "review not found", "not_found")
         return jsonify(restored), 200
 
+    app.register_blueprint(bp)
     return app
