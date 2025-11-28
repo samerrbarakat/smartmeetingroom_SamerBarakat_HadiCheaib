@@ -295,6 +295,7 @@ def create_app():
         """
         Admin can delete any user.
         A user can delete their own account.
+        We will implement MFA here . 
         """
         claims = authenticate_request(request)
         if not claims:
