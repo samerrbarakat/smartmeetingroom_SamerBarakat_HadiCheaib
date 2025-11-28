@@ -4,6 +4,8 @@ from flask_cors import CORS
 from rooms_service.auth import degenerate_jwt
 from rooms_service.helperSQL import create_room, update_room, delete_room, list_available_rooms, get_room_status, list_all_rooms
 
+ROOM_MANAGERS = {"admin", "facility_manager"}
+
 def authenticate_request(request):
     """Extract user info from JWT if present."""
     # You can improve by using flask_jwt_extended or manual verification
@@ -47,7 +49,7 @@ def create_app():
     @app.route("/api/v1/rooms", methods=["POST"])
     def create_room_route():
         claims = authenticate_request(request)
-        if not claims or claims.get("role") != "admin":
+        if not claims or claims.get("role") not in ROOM_MANAGERS:
             return jsonify({"error": "admin access required"}), 403
         payload = request.get_json(silent=True) or {}
         name = payload.get("name")
@@ -84,7 +86,7 @@ def create_app():
     @app.route("/api/v1/rooms/<int:room_id>", methods=["PATCH"])
     def update_room_route(room_id: int):
         claims = authenticate_request(request)
-        if not claims or claims.get("role") != "admin":
+        if not claims or claims.get("role") not in ROOM_MANAGERS:
             return jsonify({"error": "admin access required"}), 403
 
         payload = request.get_json(silent=True) or {}
@@ -130,7 +132,7 @@ def create_app():
     @app.route("/api/v1/rooms/<int:room_id>", methods=["DELETE"])
     def delete_room_route(room_id: int):
         claims = authenticate_request(request)
-        if not claims or claims.get("role") != "admin":
+        if not claims or claims.get("role") not in ROOM_MANAGERS:
             return jsonify({"error": "admin access required"}), 403
 
         deleted = delete_room(room_id)
@@ -141,6 +143,9 @@ def create_app():
 
     @app.route("/api/v1/rooms/available", methods=["GET"])
     def list_available_rooms_route():
+        claims = authenticate_request(request)
+        if not claims:
+            return jsonify({"error": "authentication required"}), 401
         capacity_param = request.args.get("capacity")
         location = request.args.get("location")
         equipment_param = request.args.get("equipment")
@@ -154,6 +159,9 @@ def create_app():
 
     @app.route("/api/v1/rooms/<int:room_id>/status", methods=["GET"])
     def get_room_status_route(room_id: int):
+        claims = authenticate_request(request)
+        if not claims:
+            return jsonify({"error": "authentication required"}), 401
         status_info = get_room_status(room_id)
         if status_info is None:
             return jsonify({"error": "room not found"}), 404

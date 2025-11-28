@@ -47,6 +47,23 @@ services:
     networks:
       - srms_net
 
+  reviews_service:
+    build:
+      context: .
+      dockerfile: reviews_service/Dockerfile
+    container_name: reviews_service
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://appuser:appsecret@db:5432/srms_db
+      JWT_SECRET: "your_secret_key"
+      PORT: "8000"
+    depends_on:
+      - db
+    ports:
+      - "8003:8000"
+    networks:
+      - srms_net
+
 volumes:
   db_data:
 

@@ -11,6 +11,7 @@ from reviews_service.helperSQL import (
     flag_review,
     get_review_by_id,
     list_all_reviews,
+    list_reviews_by_user,
     list_reviews_by_room,
     remove_review,
     restore_review,
@@ -18,17 +19,20 @@ from reviews_service.helperSQL import (
 )
 
 
-JWT_SECRET = os.getenv("JWT_SECRET", "your_secret_key")
+JWT_SECRET = "your_secret_key"
+ROLE_MODERATION = {"admin", "moderator"}
+ROLE_READ_ALL = {"admin", "moderator", "auditor"}
 
 
 def authenticate_request(req):
     """Extract user info from JWT if present."""
-    auth_header = req.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
+    auth_header = req.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
         return None
-    token = auth_header[len("Bearer ") :]
+    token = auth_header[len('Bearer '):]
     try:
-        return degenerate_jwt(token, secret=JWT_SECRET)
+        payload = degenerate_jwt(token, secret=JWT_SECRET)
+        return payload
     except Exception:
         return None
 
@@ -46,6 +50,8 @@ def create_app():
         claims = authenticate_request(request)
         if not claims:
             return jsonify({"error": "authentication required"}), 401
+        if claims.get("role")!= "user":
+            return jsonify({"error": "user role required to submit reviews"}), 403
 
         payload = request.get_json(silent=True) or {}
         room_id = payload.get("room_id")
@@ -71,14 +77,25 @@ def create_app():
     @app.route("/api/v1/reviews", methods=["GET"])
     def list_all_reviews_route():
         claims = authenticate_request(request)
-        if not claims or claims.get("role") not in {"admin", "moderator"}:
-            return jsonify({"error": "admin or moderator role required"}), 403
+        if not claims or claims.get("role") not in ROLE_READ_ALL:
+            return jsonify({"error": "admin, moderator, or auditor role required"}), 403
         reviews = list_all_reviews()
         return jsonify(reviews), 200
 
     @app.route("/api/v1/rooms/<int:room_id>/reviews", methods=["GET"])
     def get_reviews_for_room(room_id: int):
         reviews = list_reviews_by_room(room_id)
+        return jsonify(reviews), 200
+
+    @app.route("/api/v1/reviews/mine", methods=["GET"])
+    def get_my_reviews():
+        claims = authenticate_request(request)
+        if not claims:
+            return jsonify({"error": "authentication required"}), 401
+        user_id = claims.get("user_id")
+        if user_id is None:
+            return jsonify({"error": "user_id missing from token"}), 401
+        reviews = list_reviews_by_user(int(user_id))
         return jsonify(reviews), 200
 
     @app.route("/api/v1/reviews/<int:review_id>", methods=["PATCH"])
@@ -91,10 +108,9 @@ def create_app():
         if not existing:
             return jsonify({"error": "review not found"}), 404
 
-        is_admin_or_mod = claims.get("role") in {"admin", "moderator"}
         is_owner = str(claims.get("user_id")) == str(existing.get("user_id"))
-        if not (is_owner or is_admin_or_mod):
-            return jsonify({"error": "not authorized to update this review"}), 403
+        if not is_owner:
+            return jsonify({"error": "only the review owner can update this review"}), 403
 
         payload = request.get_json(silent=True) or {}
         rating = payload.get("rating")
@@ -136,7 +152,7 @@ def create_app():
         claims = authenticate_request(request)
         if not claims:
             return jsonify({"error": "authentication required"}), 401
-        if claims.get("role") not in {"admin", "moderator"}:
+        if claims.get("role") not in ROLE_MODERATION:
             return jsonify({"error": "admin or moderator role required"}), 403
 
         payload = request.get_json(silent=True) or {}
@@ -150,7 +166,7 @@ def create_app():
     @app.route("/api/v1/reviews/<int:review_id>/flag/clear", methods=["POST"])
     def clear_flag_route(review_id: int):
         claims = authenticate_request(request)
-        if not claims or claims.get("role") not in {"admin", "moderator"}:
+        if not claims or claims.get("role") not in ROLE_MODERATION:
             return jsonify({"error": "admin or moderator role required"}), 403
 
         cleared = flag_review(review_id, flag_reason=None, is_flagged=False)
@@ -161,7 +177,7 @@ def create_app():
     @app.route("/api/v1/reviews/<int:review_id>/remove", methods=["POST"])
     def remove_review_route(review_id: int):
         claims = authenticate_request(request)
-        if not claims or claims.get("role") not in {"admin", "moderator"}:
+        if not claims or claims.get("role") not in ROLE_MODERATION:
             return jsonify({"error": "admin or moderator role required"}), 403
 
         payload = request.get_json(silent=True) or {}
@@ -175,7 +191,7 @@ def create_app():
     @app.route("/api/v1/reviews/<int:review_id>/restore", methods=["POST"])
     def restore_review_route(review_id: int):
         claims = authenticate_request(request)
-        if not claims or claims.get("role") not in {"admin", "moderator"}:
+        if not claims or claims.get("role") not in ROLE_MODERATION:
             return jsonify({"error": "admin or moderator role required"}), 403
 
         restored = restore_review(review_id)
